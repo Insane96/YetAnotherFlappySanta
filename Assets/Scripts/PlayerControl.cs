@@ -41,6 +41,6 @@ public class PlayerControl : MonoBehaviour
         rigidbody2D.AddTorque(50f);
         isDead = true;
         animator.SetTrigger("Dead");
-        GameControl.instance.BirdDied();
+        GameControl.instance.SantaDied();
     }
 }

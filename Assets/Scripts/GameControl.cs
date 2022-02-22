@@ -1,87 +1,146 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class GameControl : MonoBehaviour
 {
-    public static Vector2 scrollSpeed = new Vector2(-1.5f, 0f);
-
     public static GameControl instance;
 
-    public GameObject gameOverText;
-    public bool gameOver = false;
-    public float timeSinceDeath = 0f;
+    private bool gameOver;
+    public bool GameOver
+    {
+        get { return gameOver; }
+        set { 
+            gameOver = value;
+            OnGameStateUpdate.Invoke(value);
+        }
+    }
+    public UnityEvent<bool> OnGameStateUpdate { get; private set; } = new UnityEvent<bool>();
 
-    public Text scoreText;
-    public Text hiScoreText;
+    public float timeSinceDeath = 0f;
 
     public AudioClip bonkClip;
     public AudioClip scoreClip;
     private AudioSource audioSource;
 
-    public int score = 0;
-    private int hiScore = 0;
+    public Text difficultyText;
+    public int difficulty { get; private set; }
 
-    // Start is called before the first frame update
     void Awake()
     {
         if (instance == null)
             instance = this;
         else if (instance != this)
             Destroy(gameObject);
+
+        DontDestroyOnLoad(gameObject);
     }
 
     void Start()
     {
-        audioSource = GetComponent<AudioSource>();
-        hiScore = PlayerPrefs.GetInt("HiScore", 0);
-        hiScoreText.text = $"Best Score: {hiScore}";
+        this.audioSource = GetComponent<AudioSource>();
+
+        this.difficulty = PlayerPrefs.GetInt("Difficulty", 0);
+        this.difficultyText.text = Difficulty.difficulties[this.difficulty].Name;
+
+        SceneManager.sceneLoaded += delegate (Scene scene, LoadSceneMode arg1)
+        {
+            this.GameOver = false;
+            if (scene.name == "Game")
+            {
+                this.GetComponent<ColumnPool>().Init();
+                this.GetComponent<ColumnPool>().enabled = true;
+            }
+            else if (scene.name == "Main")
+            {
+                this.GetComponent<ColumnPool>().enabled = false;
+            }
+        };
     }
 
     // Update is called once per frame
     void Update()
     {
-        RestartGame();
+        TryRestartGame();
 
         if (Input.GetKeyDown(KeyCode.Escape))
         {
-            Application.Quit();
+            if (SceneManager.GetActiveScene().Equals(SceneManager.GetSceneByName("Game")) && this.GameOver)
+                SceneManager.LoadScene("Main", LoadSceneMode.Single);
+            else if (SceneManager.GetActiveScene().Equals(SceneManager.GetSceneByName("Main")))
+                Application.Quit();
         }
     }
 
-    private void RestartGame()
+    private void TryRestartGame()
     {
-        if (gameOver)
+        if (this.GameOver)
         {
-            timeSinceDeath += Time.deltaTime;
-            if (timeSinceDeath > 1f)
+            this.timeSinceDeath += Time.deltaTime;
+            if (this.timeSinceDeath > 1f)
             {
-                gameOverText.transform.GetChild(0).gameObject.SetActive(true);
+                //gameOverText.transform.GetChild(0).gameObject.SetActive(true);
                 if (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0))
-                    SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                    this.StartGame();
             }
         }
     }
 
-    public void BirdScored()
+    public void StartGame()
     {
-        if (gameOver)
-            return;
-        score++;
-        scoreText.text = $"Score: {score}";
-        audioSource.clip = scoreClip;
-        audioSource.Play();
+        SceneManager.LoadScene("Game", LoadSceneMode.Single);
     }
 
-    public void BirdDied()
+    public void SantaScored()
     {
-        gameOverText.SetActive(true);
-        gameOver = true;
-        audioSource.clip = bonkClip;
-        audioSource.Play();
-        if (score > hiScore)
-            PlayerPrefs.SetInt("HiScore", score);
+        if (this.GameOver)
+            return;
+        ScoreController.instance.Score += 1;//Difficulty.difficulties[this.difficulty].ScorePerColumn;
+        this.audioSource.clip = scoreClip;
+        this.audioSource.Play();
+    }
+
+    public void SantaDied()
+    {
+        this.GameOver = true;
+        this.audioSource.clip = bonkClip;
+        this.audioSource.Play();
+        ScoreController.instance.OnDeath();
+    }
+
+    public void LoopDifficulty()
+    {
+        this.difficulty++;
+        if (this.difficulty >= Difficulty.difficulties.Length)
+            this.difficulty = 0;
+
+        PlayerPrefs.SetInt("Difficulty", this.difficulty);
+        difficultyText.text = Difficulty.difficulties[this.difficulty].Name;
+    }
+
+    public Vector2 ScrollSpeed = new Vector2(-2f, 0f);
+    public float GetColumnSpawnRate() => Difficulty.difficulties[this.difficulty].ColumnSpawnRate;
+
+    public class Difficulty
+    {
+        public static readonly Difficulty Easy = new Difficulty("Easy", 2, 2.5f);
+        public static readonly Difficulty Normal = new Difficulty("Normal", 3, 2f);
+        public static readonly Difficulty Hard = new Difficulty("Hard", 5, 1.5f);
+
+        public static readonly Difficulty[] difficulties = new Difficulty[] { Easy, Normal, Hard };
+
+        public string Name { get; }
+        public int ScorePerColumn { get; }
+        public float ColumnSpawnRate { get; }
+
+        private Difficulty(string name, int scorePerColumn, float columnSpawnRate)
+        {
+            this.Name = name;
+            this.ScorePerColumn = scorePerColumn;
+            this.ColumnSpawnRate = columnSpawnRate;
+        }
     }
 }

@@ -4,9 +4,8 @@ using UnityEngine;
 
 public class ColumnPool : MonoBehaviour
 {
-    public int columnPoolSize = 5;
+    public int columnPoolSize = 15;
     public GameObject columnPrefab;
-    public float spawnRate = 4f;
     public float columnMin = -1f;
     public float columnMax = 3.5f;
 
@@ -19,6 +18,11 @@ public class ColumnPool : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        Init();
+    }
+
+    public void Init()
+    {
         columns = new GameObject[columnPoolSize];
         for (int i = 0; i < columnPoolSize; i++)
         {
@@ -30,7 +34,7 @@ public class ColumnPool : MonoBehaviour
     void Update()
     {
         timeSinceLastSpawned += Time.deltaTime;
-        if (!GameControl.instance.gameOver && timeSinceLastSpawned >= spawnRate)
+        if (!GameControl.instance.GameOver && timeSinceLastSpawned >= GameControl.instance.GetColumnSpawnRate())
         {
             timeSinceLastSpawned = 0f;
             float spawnYPos = Random.Range(columnMin, columnMax);

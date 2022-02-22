@@ -9,7 +9,7 @@ public class Column : MonoBehaviour
         if (other.GetComponent<PlayerControl>() == null)
             return;
            
-        GameControl.instance.BirdScored();
+        GameControl.instance.SantaScored();
     }
 
     public void Init()
